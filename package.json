@@ -1,0 +1,23 @@
+{
+	"name": "hera-lang",
+	"version": "1.0.0",
+	"main": "src/core.ts",
+	"license": "MIT",
+	"scripts": {
+		"umd": "webpack --mode production --config webpack.hera.js"
+	},
+	"dependencies": {
+		"parse-combinator": "^1.0.0"
+	},
+	"devDependencies": {
+		"webpack": "4.42.0",
+		"ts-loader": "^7.0.4",
+		"webpack-cli": "^3.3.11",
+		"typescript": "^3.7.5"
+	},
+	"keywords": [
+		"Hera",
+		"Hera Lang",
+		"Program Language"
+	]
+}
