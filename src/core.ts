@@ -101,9 +101,25 @@ class Scope {
 		}
 	}
 
-	getArgsCount(name: string) {
-		const argsTable = this.stack.peek(this.currentCursor + 1);
-		return argsTable.get(name);
+	/**
+	 * Look up arguments count in stack
+	 *
+	 * @param name
+	 */
+	getArgsCount(name: string): number {
+		let cursor = this.currentCursor + 1;
+		do {
+			const argsTable = this.stack.peek(cursor);
+			const count = argsTable.get(name);
+
+			if (count !== undefined) {
+				return count;
+			}
+
+			cursor = cursor - 1;
+		} while (cursor >= 0);
+
+		return 0;
 	}
 
 	addArgsCount(name: string, count: number) {
@@ -336,9 +352,14 @@ export function compile(source: string) {
 				if (args.length < argCount) {
 					args = args.concat(Array(argCount - args.length).fill(undefined));
 				}
+
+				if (argCount === 0) {
+					return `${simpleExpression}()`;
+				}
 				if (args.every(x => !!x)) {
 					return `${simpleExpression}(${args.join(', ')})`;
 				} else {
+					const transaction = printer.transaction();
 					const params: string[] = [];
 					const rest: string[] = [];
 					for (let i = 0; i < args.length; i++) {
@@ -351,7 +372,6 @@ export function compile(source: string) {
 							params.push(args[i]);
 						}
 					}
-					const transaction = printer.transaction();
 					transaction.append('(function(f) {\n');
 					transaction.indent();
 					transaction.queue(`return function(${rest.join(', ')}) {\n`);
