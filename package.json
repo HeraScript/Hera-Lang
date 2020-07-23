@@ -1,6 +1,6 @@
 {
 	"name": "hera-lang",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"main": "src/core.ts",
 	"license": "MIT",
 	"scripts": {
@@ -10,10 +10,13 @@
 		"parse-combinator": "^1.0.0"
 	},
 	"devDependencies": {
-		"webpack": "4.42.0",
+		"@types/jest": "^26.0.5",
+		"jest": "^26.1.0",
+		"ts-jest": "^26.1.3",
 		"ts-loader": "^7.0.4",
-		"webpack-cli": "^3.3.11",
-		"typescript": "^3.7.5"
+		"typescript": "^3.7.5",
+		"webpack": "4.42.0",
+		"webpack-cli": "^3.3.11"
 	},
 	"keywords": [
 		"Hera",
