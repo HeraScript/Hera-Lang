@@ -4,7 +4,9 @@
 	"main": "src/core.ts",
 	"license": "MIT",
 	"scripts": {
-		"umd": "webpack --mode production --config webpack.hera.js"
+		"umd": "webpack --mode production --config webpack.hera.js",
+		"prepublish": "npm run umd",
+		"publish": "npm run publish"
 	},
 	"dependencies": {
 		"parse-combinator": "^1.0.0"
