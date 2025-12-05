@@ -128,12 +128,17 @@ class Scope {
 }
 
 export function compile(source: string) {
+	// 确保源代码末尾有换行符，以便正确解析文件末尾的单行注释
+	if (!source.endsWith('\n')) {
+		source = source + '\n';
+	}
+
 	const printer = new Printer();
 	const opTable = new Op();
 
 	opTable.operators[0].infix.push(
 		lexer.lexeme(
-			p.seq(s => {
+			p.seq((s) => {
 				s(p.string('`'));
 				const ops = s(identStart);
 				const opl = s(p.many(identLetter));
@@ -145,7 +150,7 @@ export function compile(source: string) {
 
 	opTable.operators[0].infixr.push(
 		lexer.lexeme(
-			p.seq(s => {
+			p.seq((s) => {
 				s(p.string('.'));
 				return (f: string, q: string) => {
 					const transaction = printer.transaction();
@@ -178,7 +183,7 @@ export function compile(source: string) {
 		let initialCursor: number = 0;
 
 		const nativeExprParser = p.many(
-			p.seq(m => {
+			p.seq((m) => {
 				m(p.notFollowedBy(lexer.semi));
 				m(p.optional(lexer.stringLiteral));
 				m(p.optional(lexer.charLiteral));
@@ -200,7 +205,7 @@ export function compile(source: string) {
 			}),
 		);
 
-		const parser = p.seq(x => {
+		const parser = p.seq((x) => {
 			initialCursor = x.state.position;
 			const reply = p.parse(p.until(lexer.semi), new p.State(x.state.source.slice(x.state.position)));
 			if (!reply.success || !reply.value) {
@@ -235,37 +240,37 @@ export function compile(source: string) {
 
 	const term: p.Parser<string> = p.label(
 		'term',
-		p.seq(m => {
+		p.seq((m) => {
 			const transaction = printer.transaction();
 
 			const arrowFunctionArgs = p.or(
-				p.fmap(x => [x], lexer.identifier),
+				p.fmap((x) => [x], lexer.identifier),
 				lexer.parens(p.sepBy(lexer.identifier, lexer.comma)),
 			);
 			const arrowFunctionBody = p.or(
 				lexer.braces(
-					p.seq(s => {
+					p.seq((s) => {
 						transaction.indent();
 						const sts = s(p.many(statement));
 						transaction.dedent();
 						return sts;
 					}),
 				),
-				p.fmap(x => {
+				p.fmap((x) => {
 					printer.indent();
 					const s = [printer.get('return '), x!, ';', '\n'];
 					printer.dedent();
 					return s;
 				}, expression),
 			);
-			const arrowFunction = p.seq(m => {
+			const arrowFunction = p.seq((m) => {
 				const args = m(arrowFunctionArgs);
 				m(lexer.symbol('=>'));
 				const body = m(arrowFunctionBody);
 				if (m.success) {
 					transaction.queue(`((${args.join(', ')}) => `);
 					transaction.append('{\n');
-					body.forEach(x => {
+					body.forEach((x) => {
 						transaction.queue(x);
 					});
 					transaction.queue('})');
@@ -273,12 +278,12 @@ export function compile(source: string) {
 				}
 			});
 
-			const nativeDirective = p.seq(m => {
+			const nativeDirective = p.seq((m) => {
 				m(lexer.reserved('native'));
 				return printer.get(m(lexer.stringLiteral));
 			});
 
-			const functionalOperator = p.fmap(op => {
+			const functionalOperator = p.fmap((op) => {
 				const transaction = printer.transaction();
 				if (opTable.binaryOps[op]) {
 					transaction.append('(function(x, y) {\n');
@@ -299,9 +304,9 @@ export function compile(source: string) {
 				}
 			}, lexer.parens(lexer.operator));
 
-			const arrayLiteral = p.fmap(xs => `[${xs.join(', ')}]`, lexer.brackets(p.sepBy(expression, lexer.comma)));
+			const arrayLiteral = p.fmap((xs) => `[${xs.join(', ')}]`, lexer.brackets(p.sepBy(expression, lexer.comma)));
 
-			const rightSection = p.seq(m => {
+			const rightSection = p.seq((m) => {
 				m(lexer.symbol('('));
 				const op = m(lexer.operator);
 				const expr = m(simpleExpressionParser);
@@ -317,7 +322,7 @@ export function compile(source: string) {
 				}
 			});
 
-			const leftSection = p.seq(m => {
+			const leftSection = p.seq((m) => {
 				m(lexer.symbol('('));
 				const expr = m(simpleExpressionParser);
 				const op = m(lexer.operator);
@@ -339,9 +344,9 @@ export function compile(source: string) {
 				arrayLiteral,
 				p.triable(rightSection),
 				p.triable(leftSection),
-				p.fmap(x => `(${x})`, lexer.parens(expression)),
-				p.fmap(x => `"${x}"`, lexer.stringLiteral),
-				p.fmap(x => x.toString(), lexer.naturalOrFloat),
+				p.fmap((x) => `(${x})`, lexer.parens(expression)),
+				p.fmap((x) => `"${x}"`, lexer.stringLiteral),
+				p.fmap((x) => x.toString(), lexer.naturalOrFloat),
 				nativeDirective,
 				lexer.identifier,
 			);
@@ -353,10 +358,12 @@ export function compile(source: string) {
 					args = args.concat(Array(argCount - args.length).fill(undefined));
 				}
 
-				if (argCount === 0) {
+				// 如果没有传入参数且参数数量未知，返回空调用
+				if (argCount === 0 && args.length === 0) {
 					return `${simpleExpression}()`;
 				}
-				if (args.every(x => !!x)) {
+				// 如果所有参数都有值，直接返回完整调用
+				if (args.every((x) => !!x)) {
 					return `${simpleExpression}(${args.join(', ')})`;
 				} else {
 					const transaction = printer.transaction();
@@ -390,7 +397,7 @@ export function compile(source: string) {
 		}),
 	);
 
-	const operatorStatement = p.seq(m => {
+	const operatorStatement = p.seq((m) => {
 		const type = m(p.choice(['infixl', 'infixr', 'infix', 'prefix', 'postfix'].map(lexer.reserved)));
 		const priority = m(lexer.natural);
 		const op = m(lexer.operator);
@@ -401,28 +408,31 @@ export function compile(source: string) {
 			opTable.operators[priority] = opTable.operators[priority] || new p.OperatorTable();
 			const table = opTable.operators[priority];
 			if (type === 'infixl') {
-				table.infixl.push(p.fmap(_ => binary!, lexer.reservedOp(op)));
+				table.infixl.push(p.fmap((_) => binary!, lexer.reservedOp(op)));
 				opTable.binaryOps[op] = binary!;
 			} else if (type === 'infixr') {
-				table.infixr.push(p.fmap(_ => binary!, lexer.reservedOp(op)));
+				table.infixr.push(p.fmap((_) => binary!, lexer.reservedOp(op)));
 				opTable.binaryOps[op] = binary!;
 			} else if (type === 'infix') {
-				table.infix.push(p.fmap(_ => binary!, lexer.reservedOp(op)));
+				table.infix.push(p.fmap((_) => binary!, lexer.reservedOp(op)));
 				opTable.binaryOps[op] = binary!;
 			} else if (type === 'prefix') {
-				table.prefix.push(p.fmap(_ => unary!, lexer.reservedOp(op)));
+				table.prefix.push(p.fmap((_) => unary!, lexer.reservedOp(op)));
 				opTable.unaryOps[op] = unary!;
 			} else if (type === 'postfix') {
-				table.postfix.push(p.fmap(_ => unary!, lexer.reservedOp(op)));
+				table.postfix.push(p.fmap((_) => unary!, lexer.reservedOp(op)));
 				opTable.unaryOps[op] = unary!;
 			}
 		}
 
-		const aliasParser = p.seq(s => {
+		const aliasParser = p.seq((s) => {
 			const f = s(lexer.identifier);
 			s(p.lookAhead(lexer.semi));
 			if (s.success) {
-				addOperator((x: string) => `${f}(${x})`, (x: string, y: string) => `${f}(${x}, ${y})`);
+				addOperator(
+					(x: string) => `${f}(${x})`,
+					(x: string, y: string) => `${f}(${x}, ${y})`,
+				);
 			}
 		});
 
@@ -433,7 +443,7 @@ export function compile(source: string) {
 				m(
 					p.or(
 						aliasParser,
-						p.seq(s => {
+						p.seq((s) => {
 							const left = s(lexer.identifier);
 							s(lexer.symbol(op));
 							const right = s(lexer.identifier);
@@ -453,7 +463,7 @@ export function compile(source: string) {
 				m(
 					p.or(
 						aliasParser,
-						p.seq(s => {
+						p.seq((s) => {
 							s(lexer.symbol(op));
 							const t = s(lexer.identifier);
 							s(lexer.symbol('=>'));
@@ -469,7 +479,7 @@ export function compile(source: string) {
 				m(
 					p.or(
 						aliasParser,
-						p.seq(s => {
+						p.seq((s) => {
 							const t = s(lexer.identifier);
 							s(lexer.symbol(op));
 							s(lexer.symbol('=>'));
@@ -488,7 +498,7 @@ export function compile(source: string) {
 	});
 
 	const functionStatement = makeScopeParser(
-		p.seq(m => {
+		p.seq((m) => {
 			const transaction = printer.transaction();
 
 			m(lexer.reserved('function'));
@@ -503,7 +513,7 @@ export function compile(source: string) {
 
 			const body: string[] = m(lexer.braces(p.many(statement)));
 			if (m.success) {
-				body.forEach(t => {
+				body.forEach((t) => {
 					transaction.append(t);
 				});
 				transaction.dedent();
@@ -513,9 +523,9 @@ export function compile(source: string) {
 		}),
 	);
 
-	const expressionStatement = p.fmap(expr => expr + ';\n', p.head(expression, lexer.semi));
+	const expressionStatement = p.fmap((expr) => expr + ';\n', p.head(expression, lexer.semi));
 
-	const valExpression = p.seq(m => {
+	const valExpression = p.seq((m) => {
 		const def = m(p.or(lexer.reserved('val'), lexer.reserved('var')));
 		const name = m(lexer.identifier);
 		m(lexer.symbol('='));
@@ -523,19 +533,19 @@ export function compile(source: string) {
 		return `${def === 'val' ? 'const' : 'var'} ${name} = ${expr}`;
 	});
 
-	const valStatement = p.seq(m => {
+	const valStatement = p.seq((m) => {
 		const expr = m(valExpression);
 		m(lexer.semi);
 		return printer.get(expr + ';\n');
 	});
 
-	const ifStatement = p.seq(m => {
+	const ifStatement = p.seq((m) => {
 		m(lexer.reserved('if'));
 		const condition = m(lexer.parens(expression));
 		const thenClause = m(blockStatement);
 		const elseClause: string = m(
 			p.option(
-				p.seq(x => {
+				p.seq((x) => {
 					x(lexer.reserved('else'));
 					return ' else ' + x(p.or(blockStatement, ifStatement));
 				}),
@@ -545,11 +555,11 @@ export function compile(source: string) {
 		return printer.get(`if(${condition}) ` + thenClause + elseClause + '\n');
 	});
 
-	const forStatement = p.seq(m => {
+	const forStatement = p.seq((m) => {
 		m(lexer.reserved('for'));
 		const head = m(
 			lexer.parens(
-				p.seq(s => {
+				p.seq((s) => {
 					const init = s(p.option(p.or(valExpression, expression), ''));
 					s(lexer.semi);
 					const condition = s(expression);
@@ -564,7 +574,7 @@ export function compile(source: string) {
 	});
 
 	const returnStatement = p.fmap(
-		expr => printer.get(`return ${expr};\n`),
+		(expr) => printer.get(`return ${expr};\n`),
 		p.between(lexer.reserved('return'), expression, lexer.semi),
 	);
 
@@ -577,7 +587,7 @@ export function compile(source: string) {
 	 * @param parser
 	 */
 	function makeScopeParser<T>(parser: p.Parser<T>) {
-		return p.seq(m => {
+		return p.seq((m) => {
 			m._userState.scope.advance(1);
 			const sts = m(parser);
 			m._userState.scope.back(1);
@@ -597,7 +607,7 @@ export function compile(source: string) {
 	const blockStatement = makeScopeParser(
 		p.or(
 			p.fmap(
-				xs => {
+				(xs) => {
 					const transaction = printer.transaction();
 					transaction.append('{\n');
 					transaction.append(xs.join(''));
@@ -605,7 +615,7 @@ export function compile(source: string) {
 					return transaction.get();
 				},
 				lexer.braces(
-					p.seq(s => {
+					p.seq((s) => {
 						printer.indent();
 						const sts = s(p.many(statement));
 						printer.dedent();
@@ -627,7 +637,11 @@ export function compile(source: string) {
 	);
 
 	const script = makeScopeParser(
-		p.between(lexer.whiteSpaceOrComment, p.fmap(xs => xs!.join(''), p.many(topLevelStatements)), p.eof),
+		p.between(
+			lexer.whiteSpaceOrComment,
+			p.fmap((xs) => xs!.join(''), p.many(topLevelStatements)),
+			p.eof,
+		),
 	);
 
 	return p.parse(script, new p.State(source, 0, { scope: new Scope() }));
